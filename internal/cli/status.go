@@ -14,6 +14,7 @@ type statusClient interface {
 	GetPositionInfo(ctx context.Context) (sonos.PositionInfo, error)
 	GetVolume(ctx context.Context) (int, error)
 	GetMute(ctx context.Context) (bool, error)
+	GetZoneInfo(ctx context.Context) (sonos.ZoneInfo, error)
 }
 
 var newStatusClient = func(ctx context.Context, flags *rootFlags) (statusClient, error) {
@@ -28,6 +29,7 @@ type statusOutput struct {
 	AlbumArtURL string              `json:"albumArtURL,omitempty"`
 	Volume      int                 `json:"volume"`
 	Mute        bool                `json:"mute"`
+	AudioFormat string              `json:"audioFormat,omitempty"`
 }
 
 func newStatusCmd(flags *rootFlags) *cobra.Command {
@@ -52,6 +54,7 @@ func newStatusCmd(flags *rootFlags) *cobra.Command {
 			position, _ := c.GetPositionInfo(ctx)
 			vol, _ := c.GetVolume(ctx)
 			mute, _ := c.GetMute(ctx)
+			zoneInfo, _ := c.GetZoneInfo(ctx)
 
 			var nowPlaying *sonos.DIDLItem
 			var albumArtURL string
@@ -68,6 +71,7 @@ func newStatusCmd(flags *rootFlags) *cobra.Command {
 				AlbumArtURL: albumArtURL,
 				Volume:      vol,
 				Mute:        mute,
+				AudioFormat: zoneInfo.AudioFormat,
 			}
 
 			if isJSON(flags) {
@@ -99,6 +103,9 @@ func newStatusCmd(flags *rootFlags) *cobra.Command {
 				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "time\t%s\n", position.RelTime)
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "duration\t%s\n", position.TrackDuration)
+				if out.AudioFormat != "" {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "audio_format\t%s\n", out.AudioFormat)
+				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "volume\t%d\n", vol)
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "mute\t%v\n", mute)
 				return nil
@@ -124,6 +131,9 @@ func newStatusCmd(flags *rootFlags) *cobra.Command {
 				if nowPlaying.AlbumArtURI != "" {
 					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "AlbumArt:\t%s\n", albumArtURL)
 				}
+			}
+			if out.AudioFormat != "" {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "AudioFormat:\t%s\n", out.AudioFormat)
 			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Time:\t\t%s / %s\n", position.RelTime, position.TrackDuration)
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Volume:\t\t%d\n", vol)

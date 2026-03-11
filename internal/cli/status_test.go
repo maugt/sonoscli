@@ -15,6 +15,7 @@ type fakeStatusClient struct {
 	position  sonos.PositionInfo
 	volume    int
 	mute      bool
+	zoneInfo  sonos.ZoneInfo
 }
 
 func (f *fakeStatusClient) GetDeviceDescription(ctx context.Context) (sonos.Device, error) {
@@ -35,6 +36,10 @@ func (f *fakeStatusClient) GetVolume(ctx context.Context) (int, error) {
 
 func (f *fakeStatusClient) GetMute(ctx context.Context) (bool, error) {
 	return f.mute, nil
+}
+
+func (f *fakeStatusClient) GetZoneInfo(ctx context.Context) (sonos.ZoneInfo, error) {
+	return f.zoneInfo, nil
 }
 
 func TestStatusShowsNowPlayingFields(t *testing.T) {
