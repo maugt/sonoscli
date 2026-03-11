@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/steipete/sonoscli/internal/sonos"
 )
@@ -41,6 +43,10 @@ func listenIPForRemote(remoteIP string) (string, error) {
 
 func newWatchCmd(flags *rootFlags) *cobra.Command {
 	var duration time.Duration
+	var natsURL string
+	var natsSubject string
+	var callbackIP string
+	var listenPort int
 
 	cmd := &cobra.Command{
 		Use:          "watch",
@@ -66,18 +72,30 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			listenIP, err := listenIPForRemote(c.IP)
-			if err != nil {
-				return err
+			var bindAddr string
+			var cbIP string
+			if callbackIP != "" {
+				// In K8s with MetalLB: bind all interfaces, use the
+				// external LB IP in the callback URL sent to Sonos.
+				bindAddr = fmt.Sprintf("0.0.0.0:%d", listenPort)
+				cbIP = callbackIP
+			} else {
+				autoIP, ipErr := listenIPForRemote(c.IP)
+				if ipErr != nil {
+					return ipErr
+				}
+				bindAddr = net.JoinHostPort(autoIP, fmt.Sprintf("%d", listenPort))
+				cbIP = autoIP
 			}
-			ln, err := net.Listen("tcp", net.JoinHostPort(listenIP, "0"))
+
+			ln, err := net.Listen("tcp", bindAddr)
 			if err != nil {
 				return err
 			}
 			defer ln.Close()
 			port := ln.Addr().(*net.TCPAddr).Port
 
-			callbackURL := fmt.Sprintf("http://%s:%d/notify", listenIP, port)
+			callbackURL := fmt.Sprintf("http://%s:%d/notify", cbIP, port)
 
 			events := make(chan watchEvent, 128)
 			var sidToService sync.Map // sid -> service name
@@ -139,6 +157,17 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 			defer func() { _ = c.Unsubscribe(context.Background(), rcSub) }()
 			sidToService.Store(rcSub.SID, "renderingcontrol")
 
+			// Optional NATS publishing.
+			var nc *nats.Conn
+			if natsURL != "" {
+				nc, err = nats.Connect(natsURL)
+				if err != nil {
+					return fmt.Errorf("nats connect: %w", err)
+				}
+				defer nc.Close()
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Connected to NATS at %s (subject prefix: %s)\n", natsURL, natsSubject)
+			}
+
 			if !isJSON(flags) && !isTSV(flags) {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Watching events (callback %s). Press Ctrl+C to stop.\n", callbackURL)
 			}
@@ -146,8 +175,20 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 			for {
 				select {
 				case <-ctx.Done():
+					if nc != nil {
+						_ = nc.Flush()
+					}
 					return nil
 				case ev := <-events:
+					// Publish to NATS if connected.
+					if nc != nil {
+						subject := natsSubject + "." + ev.Service
+						data, jerr := json.Marshal(ev)
+						if jerr == nil {
+							_ = nc.Publish(subject, data)
+						}
+					}
+
 					if isJSON(flags) {
 						_ = writeJSONLine(cmd, ev)
 						continue
@@ -180,5 +221,9 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 	}
 
 	cmd.Flags().DurationVar(&duration, "duration", 0, "Stop after this duration (0 = until Ctrl+C)")
+	cmd.Flags().StringVar(&natsURL, "nats-url", "", "NATS server URL (e.g. nats://localhost:4222). If set, events are published to NATS.")
+	cmd.Flags().StringVar(&natsSubject, "nats-subject", "sonos.events", "NATS subject prefix for published events")
+	cmd.Flags().StringVar(&callbackIP, "callback-ip", "", "External IP for Sonos NOTIFY callbacks (e.g. MetalLB LoadBalancer IP). Overrides auto-detection.")
+	cmd.Flags().IntVar(&listenPort, "listen-port", 0, "Fixed port for the callback HTTP server (0 = random)")
 	return cmd
 }
