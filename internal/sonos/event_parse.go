@@ -75,6 +75,29 @@ func parseLastChange(innerXML string) map[string]string {
 				key = key + "_" + strings.ToLower(channel)
 			}
 			out[key] = val
+
+			// If the value looks like DIDL-Lite metadata, parse out
+			// title/artist/album/albumArtURI into separate keys.
+			if strings.Contains(val, "DIDL-Lite") {
+				if item, ok := ParseNowPlaying(val); ok {
+					prefix := key
+					if item.Title != "" {
+						out[prefix+"_title"] = item.Title
+					}
+					if item.Artist != "" {
+						out[prefix+"_artist"] = item.Artist
+					}
+					if item.Album != "" {
+						out[prefix+"_album"] = item.Album
+					}
+					if item.AlbumArtURI != "" {
+						out[prefix+"_album_art_uri"] = item.AlbumArtURI
+					}
+					if item.URI != "" {
+						out[prefix+"_uri"] = item.URI
+					}
+				}
+			}
 		case xml.EndElement:
 			if t.Name.Local == "InstanceID" || t.Name.Local == "QueueID" {
 				inInstance = false

@@ -172,6 +172,8 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Watching events (callback %s). Press Ctrl+C to stop.\n", callbackURL)
 			}
 
+			var lastTrack string
+
 			for {
 				select {
 				case <-ctx.Done():
@@ -180,6 +182,38 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 					}
 					return nil
 				case ev := <-events:
+					// Enrich AVTransport events with track metadata
+					// when the track changes or playback starts.
+					if ev.Service == "avtransport" {
+						track := ev.Vars["current_track"]
+						state := ev.Vars["transport_state"]
+						if track != lastTrack || state == "PLAYING" {
+							if track != "" {
+								lastTrack = track
+							}
+							pos, perr := c.GetPositionInfo(ctx)
+							if perr == nil {
+								if pos.TrackURI != "" {
+									ev.Vars["track_uri"] = pos.TrackURI
+								}
+								if np, ok := sonos.ParseNowPlaying(pos.TrackMeta); ok {
+									if np.Title != "" {
+										ev.Vars["title"] = np.Title
+									}
+									if np.Artist != "" {
+										ev.Vars["artist"] = np.Artist
+									}
+									if np.Album != "" {
+										ev.Vars["album"] = np.Album
+									}
+									if np.AlbumArtURI != "" {
+										ev.Vars["album_art_url"] = sonos.AlbumArtURL(c.IP, np.AlbumArtURI)
+									}
+								}
+							}
+						}
+					}
+
 					// Publish to NATS if connected.
 					if nc != nil {
 						subject := natsSubject + "." + ev.Service
