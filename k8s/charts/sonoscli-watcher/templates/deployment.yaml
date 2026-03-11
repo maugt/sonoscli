@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Waits for MetalLB to assign a LoadBalancer IP, then writes
+        # it to a shared volume.
+        - name: wait-for-lb
+          image: curlimages/curl:8.12.1
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              SA=/var/run/secrets/kubernetes.io/serviceaccount
+              API="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+              URL="${API}/api/v1/namespaces/{{ .Release.Namespace }}/services/{{ .Release.Name }}"
+              echo "SA path: ${SA}"
+              echo "API server: ${API}"
+              echo "Service URL: ${URL}"
+              echo "Token file exists: $(test -f ${SA}/token && echo yes || echo no)"
+              echo "CA file exists: $(test -f ${SA}/ca.crt && echo yes || echo no)"
+              echo "Waiting for LoadBalancer IP..."
+              ATTEMPT=0
+              while true; do
+                ATTEMPT=$((ATTEMPT + 1))
+                TOKEN=$(cat ${SA}/token)
+                RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" --cacert ${SA}/ca.crt \
+                  -H "Authorization: Bearer ${TOKEN}" "${URL}" 2>&1)
+                HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
+                BODY=$(echo "$RESPONSE" | grep -v "HTTP_CODE:")
+                echo "[attempt ${ATTEMPT}] HTTP status: ${HTTP_CODE}"
+                echo "[attempt ${ATTEMPT}] Response (last 5 lines):"
+                echo "$BODY" | tail -5
+                GREP_RESULT=$(echo "$BODY" | grep -o '"ip": *"[^"]*"' || echo "(no match)")
+                echo "[attempt ${ATTEMPT}] grep result: ${GREP_RESULT}"
+                IP=$(echo "$GREP_RESULT" | head -1 | cut -d'"' -f4)
+                echo "[attempt ${ATTEMPT}] extracted IP: '${IP}'"
+                if [ -n "$IP" ] && [ "$IP" != "(no match)" ]; then
+                  echo "$IP" > /shared/callback-ip
+                  echo "Got LB IP: $IP"
+                  exit 0
+                fi
+                sleep 2
+              done
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+      containers:
+        - name: watcher
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              CALLBACK_IP=$(cat /shared/callback-ip)
+              exec sonos watch \
+                --ip "{{ .Values.sonos.speakerIP }}" \
+                --nats-url "{{ .Values.nats.url }}" \
+                --nats-subject "{{ .Values.nats.subjectPrefix }}" \
+                --callback-ip "$CALLBACK_IP" \
+                --listen-port "{{ .Values.callback.port }}" \
+                --format json
+          ports:
+            - containerPort: {{ .Values.callback.port }}
+              name: callback
+              protocol: TCP
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: shared
+          emptyDir: {}

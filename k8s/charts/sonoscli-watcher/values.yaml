@@ -1,0 +1,30 @@
+image:
+  repository: ghcr.io/maugt/sonoscli
+  tag: latest
+  pullPolicy: Always
+
+sonos:
+  # Target speaker IP address.
+  speakerIP: "192.168.8.56"
+
+nats:
+  # NATS server URL.
+  url: nats://nats.sonos.svc.cluster.local:4222
+  # Subject prefix for published events.
+  subjectPrefix: sonos.events
+
+metallb:
+  # MetalLB address pool name to allocate the LoadBalancer IP from.
+  pool: first-pool
+
+callback:
+  # Port the watcher listens on for Sonos NOTIFY callbacks.
+  port: 8400
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

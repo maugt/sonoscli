@@ -1,0 +1,34 @@
+# Helm values for nats/nats (https://github.com/nats-io/k8s/tree/main/helm/charts/nats)
+#
+# Install:
+#   helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+#   helm install nats nats/nats -n sonos --create-namespace -f k8s/values.yaml
+#
+# Upgrade:
+#   helm upgrade nats nats/nats -n sonos -f k8s/values.yaml
+
+config:
+  jetstream:
+    enabled: true
+    fileStore:
+      pvc:
+        size: 1Gi
+
+container:
+  image:
+    tag: 2-alpine
+  env:
+    # Monitoring endpoint for health checks
+    NATS_HTTP_PORT: "8222"
+  merge:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+# Single replica is fine for home use; bump to 3 for HA.
+config.cluster:
+  enabled: false
