@@ -37,7 +37,7 @@ func newStatusCmd(flags *rootFlags) *cobra.Command {
 		Use:          "status",
 		Aliases:      []string{"now"},
 		Short:        "Show current playback status",
-		Long:         "Prints coordinator status (transport state, track URI, time, volume/mute). Parses TrackMetaData when available to show title/artist/album/album art. Use --format json for machine-readable output.",
+		Long:         "Prints coordinator status (transport state, track URI, time, volume/mute). Parses TrackMetaData when available to show title/artist/album/album art. On soundbar/HT devices, shows the audio input format (e.g. Dolby Digital, Dolby Atmos, DTS, PCM). Use --format json for machine-readable output.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateTarget(flags); err != nil {

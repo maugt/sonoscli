@@ -112,6 +112,7 @@ TV input (soundbars/home theater):
   - `sonos group solo --name "<soundbar room>"`
 - `sonos tv --name "<soundbar room>"`
 - `sonos status --name "<soundbar room>"` should show a URI like `x-sonos-htastream:<UUID>:spdif`
+- `sonos status --name "<soundbar room>"` should show `AudioFormat:` with the encoding (e.g. `Dolby Digital 5.1`, `Dolby Atmos (DD+)`, `Stereo PCM`)
 
 Line-in (devices with analog-in, e.g. Sonos Five):
 - `sonos linein --name "<room>"` (defaults `--from` to the same room)

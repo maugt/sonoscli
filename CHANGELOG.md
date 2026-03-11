@@ -23,7 +23,7 @@
   - Global `--format plain|json|tsv` flag (and deprecated `--json` alias for `--format json`).
   - Consistent JSON output shape for action commands (`{ ok, action, ... }`).
 - Coordinator-aware targeting via `--name` / `--ip` (commands sent to the group coordinator when possible).
-- `sonos status` (and `sonos now` alias) showing transport/position + volume/mute, plus parsed DIDL `TrackMetaData` when available (`Title`, `Artist`, `Album`, `AlbumArt`).
+- `sonos status` (and `sonos now` alias) showing transport/position + volume/mute, plus parsed DIDL `TrackMetaData` when available (`Title`, `Artist`, `Album`, `AlbumArt`). On soundbar/HT devices, shows the audio input format (e.g. Dolby Digital, Dolby Atmos, DTS, PCM) via `GetZoneInfo`.
 - Transport controls: `sonos play`, `pause`, `stop`, `next`, `prev`.
 - Volume controls: `sonos volume get|set`.
 - Mute controls: `sonos mute get|on|off|toggle`.

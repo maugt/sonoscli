@@ -112,7 +112,7 @@ Note: this starts a local callback server for UPnP events; your OS firewall may 
 
 Run `sonos --help` for the full list. Most commonly used:
 
-- Discovery & status: `discover`, `status`/`now`, `watch`
+- Discovery & status: `discover`, `status`/`now` (includes audio format on soundbars), `watch`
 - Playback: `play`, `pause`, `stop`, `next`, `prev`, `open`, `enqueue`, `play-uri`, `linein`, `tv`
 - Grouping: `group status`, `group join`, `group unjoin`, `group solo`, `group party`, `group dissolve`
 - Queue: `queue list`, `queue play`, `queue remove`, `queue clear`

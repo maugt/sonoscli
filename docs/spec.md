@@ -74,7 +74,7 @@ Key services/actions:
 
 ### Status
 
-- `sonos status --name "<Room>"` (or `sonos now`) – show playback status, current URI, time, volume/mute, and parsed now-playing metadata when available (`Title/Artist/Album/AlbumArt`).
+- `sonos status --name "<Room>"` (or `sonos now`) – show playback status, current URI, time, volume/mute, and parsed now-playing metadata when available (`Title/Artist/Album/AlbumArt`). On soundbar/HT devices, shows the audio input format (e.g. Dolby Digital, Dolby Atmos, DTS, PCM) via `GetZoneInfo` `HTAudioIn`.
   - `--format json` supported.
 
 ### Transport
